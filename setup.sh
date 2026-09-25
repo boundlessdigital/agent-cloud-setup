@@ -31,8 +31,15 @@ log "start"
     && unzip -q -o awscli.zip && ./aws/install --update
 ) || log "WARN: aws cli install failed" &
 
+# sops: the release's prebuilt binary, checked against its published SHA-256. (Compiling it with
+# `go install` took minutes and was the slowest step of the whole setup.)
 (
-  GOBIN=/usr/local/bin go install github.com/getsops/sops/v3/cmd/sops@v3.13.3
+  case "$(uname -m)" in aarch64|arm64) sops_arch=arm64 ;; *) sops_arch=amd64 ;; esac
+  sops_file="sops-v3.13.3.linux.$sops_arch"
+  cd /tmp && curl -fsSL "https://github.com/getsops/sops/releases/download/v3.13.3/$sops_file" -o "$sops_file" \
+    && curl -fsSL https://github.com/getsops/sops/releases/download/v3.13.3/sops-v3.13.3.checksums.txt \
+      | grep " $sops_file\$" | sha256sum -c - >/dev/null \
+    && install -m 755 "$sops_file" /usr/local/bin/sops
 ) || log "WARN: sops install failed" &
 
 (corepack enable && corepack prepare pnpm@10.34.2 --activate) || log "WARN: pnpm 10.34.2 activation failed" &
@@ -49,9 +56,11 @@ log "start"
 (npm install -g --silent opencode-ai@1.18.31 @openai/codex@0.155.1 @earendil-works/pi-coding-agent@0.83.0) \
   || log "WARN: opencode/codex/pi install failed" &
 
-# Hermes Agent (Nous Research), official installer; --skip-setup skips its interactive wizard.
+# Hermes Agent (Nous Research), official installer. --skip-setup skips its interactive wizard;
+# --skip-browser skips its Chromium download, the other slow step. Add it back in a session with
+# `hermes pm install agent-browser` if you need Hermes to drive a browser.
 (
-  curl -fsSL https://hermes-agent.nousresearch.com/install.sh | bash -s -- --skip-setup >/tmp/hermes-install.log 2>&1 \
+  curl -fsSL https://hermes-agent.nousresearch.com/install.sh | bash -s -- --skip-setup --skip-browser >/tmp/hermes-install.log 2>&1 \
     && ln -sf "$HOME/.local/bin/hermes" /usr/local/bin/hermes
 ) || log "WARN: hermes install failed (see /tmp/hermes-install.log)" &
 
