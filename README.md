@@ -49,6 +49,7 @@ cloud-doctor --agents
 |---|---|
 | Open production write for one hour | `cloud-production-write <6-digit code> [target]` |
 | Log Codex in | `codex login --device-auth`, then approve on your phone. Needed per session. |
+| Update the current session to the latest setup | `cloud-update`, or tell the agent "update the cloud environment". Every agent's start-up instructions (`~/.claude/CLAUDE.md`, `~/.codex/AGENTS.md`, `~/.config/opencode/AGENTS.md`) list these commands. New sessions keep the cached build until the setup script is edited. |
 | Use it without a default environment | Run the setup line above inside any cloud session, then `cloud-session-start` |
 
 ## Security notes

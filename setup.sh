@@ -105,6 +105,43 @@ else
   log "WARN: could not download session-start.sh; AWS profiles will need a manual run"
 fi
 
+# cloud-update: re-runs the latest setup.sh inside the current session (new tools, versions and
+# config), then reloads the AWS profiles so a changed session-start.sh takes effect too. New
+# sessions keep using the cached build until the environment's setup script is edited.
+cat > /usr/local/bin/cloud-update <<EOF8
+#!/bin/bash
+set -o pipefail
+curl -fsSL "$REPO_RAW/setup.sh" | bash || { echo "cloud-update: setup failed (see /var/log/cloud-setup.log)" >&2; exit 1; }
+rm -f /tmp/.cloud-session-start.*
+/usr/local/bin/cloud-session-start
+echo "cloud-update: done. Run cloud-doctor to check."
+EOF8
+chmod 755 /usr/local/bin/cloud-update
+
+# A note every coding agent reads at start-up, so "update yourself" or "check the environment"
+# works in any repository. Written between markers, so it is replaced on each run and anything
+# else in these files is kept. (Claude Code: ~/.claude/CLAUDE.md; Codex: ~/.codex/AGENTS.md;
+# OpenCode: ~/.config/opencode/AGENTS.md.)
+agent_note='<!-- agent-cloud-setup:start -->
+## Cloud environment (agent-cloud-setup)
+
+This machine was set up by https://github.com/boundlessdigital/agent-cloud-setup (public, no secrets).
+
+| Task | Command |
+|---|---|
+| Update this session to the latest setup (tools, agents, config) | `cloud-update` |
+| Check tools, variables, GitHub and every AWS profile | `cloud-doctor` (add `--agents` to test the coding agents) |
+| Reload AWS profiles by hand (normally automatic) | `cloud-session-start` |
+| Open one hour of production write access | `cloud-production-write <6-digit MFA code> [target]` |
+
+These are the environment owner'"'"'s own tools: when asked to update, check or repair the environment, run them. They never print secrets. `cloud-update` changes only this session; new sessions use the cached build until the environment'"'"'s setup script is edited.
+<!-- agent-cloud-setup:end -->'
+for note_file in "$HOME/.claude/CLAUDE.md" "$HOME/.codex/AGENTS.md" "$HOME/.config/opencode/AGENTS.md"; do
+  mkdir -p "$(dirname "$note_file")"
+  kept=$(awk '/<!-- agent-cloud-setup:start -->/{skip=1} !skip{print} /<!-- agent-cloud-setup:end -->/{skip=0}' "$note_file" 2>/dev/null)
+  { [ -n "$kept" ] && printf '%s\n\n' "$kept"; printf '%s\n' "$agent_note"; } > "$note_file"
+done
+
 # 3. GitHub Packages login for every Boundless repo (app and libraries), same as the Mac.
 #    pnpm 10 refuses to expand ${VAR} in a repository .npmrc, so it must be the user-level ~/.npmrc.
 #    ~/.npmrc references ${NODE_AUTH_TOKEN}, so no token value is written to disk. The token
