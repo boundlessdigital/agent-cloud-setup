@@ -14,6 +14,15 @@ set -u
 log() { echo "[cloud-setup] $(date -u +%H:%M:%S) $*" | tee -a /var/log/cloud-setup.log; }
 log "start"
 
+# The cloud image sets UV_NATIVE_TLS, which uv 0.11 deprecated in favor of UV_SYSTEM_CERTS (same
+# meaning: use the machine's certificate store) and warns about on every run. Carry the value over
+# to the new name, here for this script's own uv calls and in every shell start-up below.
+UV_TLS_MIGRATION='if [ -n "${UV_NATIVE_TLS:-}" ]; then export UV_SYSTEM_CERTS="${UV_SYSTEM_CERTS:-$UV_NATIVE_TLS}"; unset UV_NATIVE_TLS; fi'
+eval "$UV_TLS_MIGRATION"
+for rc in /etc/bash.bashrc "$HOME/.bashrc" "$HOME/.profile"; do
+  grep -q 'UV_SYSTEM_CERTS' "$rc" 2>/dev/null || printf '\n# agent-cloud-setup: uv deprecated UV_NATIVE_TLS; use UV_SYSTEM_CERTS\n%s\n' "$UV_TLS_MIGRATION" >> "$rc"
+done
+
 # 1. Tools the repo depends on that the base image lacks or has at the wrong version.
 #    uv and Python are pinned by scripts/mcp/run_mcp_package.mjs (REVIEWED_UV_VERSION,
 #    REVIEWED_PYTHON_VERSION); the AWS MCP servers refuse to start on other versions.
