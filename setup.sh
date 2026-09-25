@@ -133,6 +133,7 @@ This machine was set up by https://github.com/boundlessdigital/agent-cloud-setup
 | Check tools, variables, GitHub and every AWS profile | `cloud-doctor` (add `--agents` to test the coding agents) |
 | Reload AWS profiles by hand (normally automatic) | `cloud-session-start` |
 | Open one hour of production write access | `cloud-production-write <6-digit MFA code> [target]` |
+| See what the setup script did and how long it took | `/var/log/cloud-setup.log` (the setup script itself is in the environment'"'"'s settings, not in the repository) |
 
 These are the environment owner'"'"'s own tools: when asked to update, check or repair the environment, run them. They never print secrets. `cloud-update` changes only this session; new sessions use the cached build until the environment'"'"'s setup script is edited.
 <!-- agent-cloud-setup:end -->'
