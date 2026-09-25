@@ -58,8 +58,43 @@ log "start"
 wait
 log "tools installed: jq $(jq --version 2>/dev/null), gh $(gh --version 2>/dev/null | head -1 | cut -d' ' -f3), uv $(uv --version 2>/dev/null | cut -d' ' -f2), aws $(aws --version 2>/dev/null | cut -d' ' -f1), sops $(sops --version 2>/dev/null | head -1 | cut -d' ' -f2), pnpm $(pnpm --version 2>/dev/null), opencode $(opencode --version 2>/dev/null), codex $(codex --version 2>/dev/null | cut -d' ' -f2), pi $(pi --version 2>/dev/null), hermes $(hermes --version 2>/dev/null | head -1)"
 
-# 2. AWS credentials are NOT set up here: a setup script does not see the environment's variables.
-#    session-start.sh in this repo writes ~/.aws at the start of every session instead.
+# 2. AWS credentials. A setup script does not see the environment's variables, so the credentials
+#    are written at run time instead, automatically, whatever the repository or agent:
+#    - cloud-session-start runs session-start.sh once per machine start-up (a boot-id marker makes
+#      repeat calls free);
+#    - every shell start-up calls it (/etc/bash.bashrc, ~/.bashrc, ~/.profile), which covers the
+#      shells coding agents open to run commands;
+#    - aws and sops get wrappers in /usr/local/sbin (ahead of /usr/local/bin on PATH) that call it
+#      before running the real program, for commands started without a shell start-up.
+REPO_RAW=${AGENT_CLOUD_SETUP_RAW:-https://raw.githubusercontent.com/boundlessdigital/agent-cloud-setup/main}
+mkdir -p /usr/local/lib/agent-cloud-setup
+if curl -fsSL "$REPO_RAW/session-start.sh" -o /usr/local/lib/agent-cloud-setup/session-start.sh \
+  && curl -fsSL "$REPO_RAW/production-write.sh" -o /usr/local/lib/agent-cloud-setup/production-write.sh \
+  && curl -fsSL "$REPO_RAW/doctor.sh" -o /usr/local/lib/agent-cloud-setup/doctor.sh; then
+  chmod 755 /usr/local/lib/agent-cloud-setup/*.sh
+  ln -sf /usr/local/lib/agent-cloud-setup/production-write.sh /usr/local/bin/cloud-production-write
+  ln -sf /usr/local/lib/agent-cloud-setup/doctor.sh /usr/local/bin/cloud-doctor
+  cat > /usr/local/bin/cloud-session-start <<'EOF7'
+#!/bin/bash
+# Runs agent-cloud-setup's session-start.sh once per machine start-up. Always exits 0.
+marker=/tmp/.cloud-session-start.$(cat /proc/sys/kernel/random/boot_id 2>/dev/null || echo boot)
+[ -e "$marker" ] && exit 0
+CLOUD_AGENT=1 bash /usr/local/lib/agent-cloud-setup/session-start.sh >/dev/null 2>&1
+touch "$marker" 2>/dev/null
+exit 0
+EOF7
+  chmod 755 /usr/local/bin/cloud-session-start
+  for rc in /etc/bash.bashrc "$HOME/.bashrc" "$HOME/.profile"; do
+    grep -q 'cloud-session-start' "$rc" 2>/dev/null || printf '\n# agent-cloud-setup: load AWS profiles once per machine start-up\n[ -x /usr/local/bin/cloud-session-start ] && /usr/local/bin/cloud-session-start\n' >> "$rc"
+  done
+  mkdir -p /usr/local/sbin
+  for tool in aws sops; do
+    printf '#!/bin/bash\n/usr/local/bin/cloud-session-start\nexec /usr/local/bin/%s "$@"\n' "$tool" > "/usr/local/sbin/$tool"
+    chmod 755 "/usr/local/sbin/$tool"
+  done
+else
+  log "WARN: could not download session-start.sh; AWS profiles will need a manual run"
+fi
 
 # 3. GitHub Packages login for every Boundless repo (app and libraries), same as the Mac.
 #    pnpm 10 refuses to expand ${VAR} in a repository .npmrc, so it must be the user-level ~/.npmrc.

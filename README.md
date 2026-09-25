@@ -35,27 +35,21 @@ On Claude Code on the web: claude.ai/code → the environment's gear icon → **
 
 Ask Sidney for your IAM user, profile list and MFA setup.
 
-**3. Load your AWS profiles at the start of each session.** Cloud machines start fresh, and a setup script can't see your variables, so this runs per session:
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/boundlessdigital/agent-cloud-setup/main/session-start.sh | bash
-```
-
-In a Claude Code repository you can make this automatic with a `SessionStart` hook in `.claude/settings.json`. bng-platform already has its own. Otherwise, ask the agent to run it first.
+**3. AWS profiles load by themselves.** A setup script can't see your variables, so `setup.sh` installs `cloud-session-start`, which writes your profiles once per machine start-up. It runs from every shell start-up, and from wrappers around `aws` and `sops`. This works in any repository and for any agent, with nothing to remember. To run it by hand: `cloud-session-start`.
 
 **4. Check everything:**
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/boundlessdigital/agent-cloud-setup/main/doctor.sh | bash -s -- --agents
+cloud-doctor --agents
 ```
 
 ## Day to day
 
 | Task | How |
 |---|---|
-| Open production write for one hour | `curl -fsSL …/production-write.sh \| bash -s -- <6-digit code> [target]` |
+| Open production write for one hour | `cloud-production-write <6-digit code> [target]` |
 | Log Codex in | `codex login --device-auth`, then approve on your phone. Needed per session. |
-| Use it without a default environment | Run the setup and session-start lines above inside any cloud session |
+| Use it without a default environment | Run the setup line above inside any cloud session, then `cloud-session-start` |
 
 ## Security notes
 
