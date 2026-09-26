@@ -51,8 +51,10 @@ done
     && ln -sf "$HOME/.local/bin/graphify" /usr/local/bin/graphify
 ) || log "WARN: uv/python/graphify install failed" &
 
+# AWS publishes one installer per architecture; the x86_64 one fails on ARM hosts.
 (
-  cd /tmp && curl -sSL https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip -o awscli.zip \
+  case "$(uname -m)" in aarch64|arm64) awscli_arch=aarch64 ;; *) awscli_arch=x86_64 ;; esac
+  cd /tmp && curl -fsSL "https://awscli.amazonaws.com/awscli-exe-linux-$awscli_arch.zip" -o awscli.zip \
     && unzip -q -o awscli.zip && ./aws/install --update
 ) || log "WARN: aws cli install failed" &
 
