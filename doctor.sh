@@ -110,5 +110,8 @@ if $check_agents; then
 fi
 
 echo
-if [ "$failures" -eq 0 ]; then echo "All checks passed."; else echo "$failures check(s) failed."; fi
-exit 0
+# Exit non-zero on any FAIL so scripts, CI and agents can gate on the result instead of parsing
+# the summary line. The setup never calls cloud-doctor, so this cannot block a session start.
+if [ "$failures" -eq 0 ]; then echo "All checks passed."; exit 0; fi
+echo "$failures check(s) failed."
+exit 1
