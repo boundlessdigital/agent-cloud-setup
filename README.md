@@ -19,6 +19,14 @@ Sets up a coding-agent cloud environment (Claude Code on the web, and other Ubun
 curl -fsSL https://raw.githubusercontent.com/boundlessdigital/agent-cloud-setup/main/setup.sh | bash
 ```
 
+**No permission prompts (optional, personal environments only).** Cloud sessions don't offer bypass-permissions mode. The closest equivalent is this line instead:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/boundlessdigital/agent-cloud-setup/main/setup.sh | bash -s -- --no-permission-prompts
+```
+
+It starts Claude Code in **Accept edits** mode with every tool pre-approved, so nothing prompts and the auto-mode safety filter doesn't run. Keep the session's mode dropdown on **Accept edits**: in **Auto**, Claude Code ignores broad approvals and the filter comes back. Production AWS writes still need an MFA code.
+
 On Claude Code on the web: claude.ai/code → the environment's gear icon → **Setup script**. The result is cached for about a week. To pick up a newer version sooner, edit the setup script (adding a comment is enough).
 
 **2. In the environment's variables, add your own values:**

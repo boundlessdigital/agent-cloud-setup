@@ -4,6 +4,11 @@
 #
 #   curl -fsSL https://raw.githubusercontent.com/boundlessdigital/agent-cloud-setup/main/setup.sh | bash
 #
+# Option (add after `bash -s --`):
+#   --no-permission-prompts   Claude Code starts in Accept edits mode with every tool pre-approved, the
+#                             closest a cloud session gets to bypass-permissions mode (which cloud
+#                             sessions don't offer). Only for a personal environment you trust.
+#
 # Contains NO secrets: every key comes from the environment's variables at run time (see README.md).
 # Runs as root, once per cached environment build. Must exit 0 and finish within ~5 minutes.
 # Status lines are kept in /var/log/cloud-setup.log.
@@ -13,6 +18,17 @@ set -u
 # whole script through tee kept the output stream open and the setup step never finished.)
 log() { echo "[cloud-setup] $(date -u +%H:%M:%S) $*" | tee -a /var/log/cloud-setup.log; }
 log "start"
+
+# Options. They are saved so cloud-update re-applies the same ones.
+NO_PERMISSION_PROMPTS=false
+for arg in "$@"; do
+  case "$arg" in
+    --no-permission-prompts) NO_PERMISSION_PROMPTS=true ;;
+    *) log "WARN: unknown option $arg (ignored)" ;;
+  esac
+done
+mkdir -p /usr/local/lib/agent-cloud-setup
+printf '%s\n' "$*" > /usr/local/lib/agent-cloud-setup/options
 
 # The cloud image sets UV_NATIVE_TLS, which uv 0.11 deprecated in favor of UV_SYSTEM_CERTS (same
 # meaning: use the machine's certificate store) and warns about on every run. Carry the value over
@@ -120,7 +136,9 @@ fi
 cat > /usr/local/bin/cloud-update <<EOF8
 #!/bin/bash
 set -o pipefail
-curl -fsSL "$REPO_RAW/setup.sh" | bash || { echo "cloud-update: setup failed (see /var/log/cloud-setup.log)" >&2; exit 1; }
+# Options given here replace the saved ones; with none, the saved ones are re-applied.
+[ \$# -gt 0 ] && options="\$*" || options=\$(cat /usr/local/lib/agent-cloud-setup/options 2>/dev/null)
+curl -fsSL "$REPO_RAW/setup.sh" | bash -s -- \$options || { echo "cloud-update: setup failed (see /var/log/cloud-setup.log)" >&2; exit 1; }
 rm -f /tmp/.cloud-session-start.*
 /usr/local/bin/cloud-session-start
 echo "cloud-update: done. Run cloud-doctor to check."
@@ -208,6 +226,26 @@ if command -v hermes >/dev/null; then
   hermes config set model.provider fireworks >/dev/null 2>&1 \
     && hermes config set model.default accounts/fireworks/models/deepseek-v4p1-flash >/dev/null 2>&1 \
     || log "WARN: could not set the hermes model"
+fi
+
+# 5. Claude Code permissions (only with --no-permission-prompts). Cloud sessions can't use
+#    bypass-permissions mode, but they honor defaultMode "acceptEdits", and in that mode allow rules
+#    approve a tool without a prompt and without the auto-mode safety filter. Merged into the
+#    session's own ~/.claude/settings.json, keeping any other keys. Pick "Accept edits" in the
+#    session's mode dropdown: in Auto mode, Claude Code suspends broad allow rules like "Bash".
+if [ "$NO_PERMISSION_PROMPTS" = true ]; then
+  mkdir -p "$HOME/.claude"
+  settings="$HOME/.claude/settings.json"
+  [ -s "$settings" ] || echo '{}' > "$settings"
+  if jq '.permissions.defaultMode = "acceptEdits"
+         | .permissions.allow = ((.permissions.allow // []) + ["Bash", "Edit", "Write", "NotebookEdit", "WebFetch", "WebSearch", "Agent", "Monitor"] | unique)' \
+       "$settings" > "$settings.tmp"; then
+    mv "$settings.tmp" "$settings"
+    log "permission prompts off: Accept edits mode with every tool pre-approved"
+  else
+    rm -f "$settings.tmp"
+    log "WARN: could not write $settings"
+  fi
 fi
 
 log "done"
