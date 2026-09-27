@@ -237,11 +237,21 @@ if [ "$NO_PERMISSION_PROMPTS" = true ]; then
   mkdir -p "$HOME/.claude"
   settings="$HOME/.claude/settings.json"
   [ -s "$settings" ] || echo '{}' > "$settings"
-  if jq '.permissions.defaultMode = "acceptEdits"
-         | .permissions.allow = ((.permissions.allow // []) + ["Bash", "Edit", "Write", "NotebookEdit", "WebFetch", "WebSearch", "Agent", "Monitor"] | unique)' \
+  # MCP tools can't be pre-approved with one allow rule: Claude Code skips "mcp__*" and wants each
+  # server named, and the servers differ per repository and per claude.ai connector. A PreToolUse
+  # hook that answers "allow" for every tool whose name starts with mcp__ covers them all. (Connector
+  # tools an organization set to "ask" still prompt; nothing can override that.)
+  allow_mcp=/usr/local/lib/agent-cloud-setup/allow-mcp.sh
+  printf '#!/bin/bash\n# agent-cloud-setup: approve every MCP tool call (only with --no-permission-prompts).\ncat >/dev/null\necho %s\n' \
+    "'{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"allow\",\"permissionDecisionReason\":\"agent-cloud-setup --no-permission-prompts\"}}'" > "$allow_mcp"
+  chmod 755 "$allow_mcp"
+  if jq --arg hook "$allow_mcp" '.permissions.defaultMode = "acceptEdits"
+         | .permissions.allow = ((.permissions.allow // []) + ["Bash", "Edit", "Write", "NotebookEdit", "WebFetch", "WebSearch", "Agent", "Monitor"] | unique)
+         | .hooks.PreToolUse = ([(.hooks.PreToolUse // [])[] | select(any(.hooks[]?; .command == $hook) | not)]
+             + [{"matcher": "mcp__.*", "hooks": [{"type": "command", "command": $hook}]}])' \
        "$settings" > "$settings.tmp"; then
     mv "$settings.tmp" "$settings"
-    log "permission prompts off: Accept edits mode with every tool pre-approved"
+    log "permission prompts off: Accept edits mode with every tool, MCP tools included, pre-approved"
   else
     rm -f "$settings.tmp"
     log "WARN: could not write $settings"

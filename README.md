@@ -25,7 +25,7 @@ curl -fsSL https://raw.githubusercontent.com/boundlessdigital/agent-cloud-setup/
 curl -fsSL https://raw.githubusercontent.com/boundlessdigital/agent-cloud-setup/main/setup.sh | bash -s -- --no-permission-prompts
 ```
 
-It starts Claude Code in **Accept edits** mode with every tool pre-approved, so nothing prompts and the auto-mode safety filter doesn't run. Keep the session's mode dropdown on **Accept edits**: in **Auto**, Claude Code ignores broad approvals and the filter comes back. Production AWS writes still need an MFA code.
+It starts Claude Code in **Accept edits** mode with every tool pre-approved (built-in tools by allow rules, MCP tools by a hook, because Claude Code has no single allow rule for all MCP servers), so nothing prompts and the auto-mode safety filter doesn't run. Keep the session's mode dropdown on **Accept edits**: in **Auto**, Claude Code ignores broad approvals and the filter comes back. Production AWS writes still need an MFA code.
 
 On Claude Code on the web: claude.ai/code → the environment's gear icon → **Setup script**. The result is cached for about a week. To pick up a newer version sooner, edit the setup script (adding a comment is enough).
 
