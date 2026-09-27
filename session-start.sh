@@ -10,7 +10,7 @@
 #       One long-lived key for a user whose only power is assuming roles. Deliberately NOT the
 #       standard AWS_ACCESS_KEY_ID names: the AWS CLI and SDKs prefer those over AWS_PROFILE, so
 #       every command would run as the bare user.
-#   CLOUD_AWS_PROFILES
+#   CLOUD_AWS_PROFILES (plus any CLOUD_AWS_PROFILES_<SUFFIX>, joined)
 #       The profiles to create, comma-separated, each  name:account_id:role_name:region
 #       e.g.  dev:111111111111:ClaudeCloudAdmin:us-east-1,prod-readonly:222222222222:ClaudeCloudReadOnly:us-east-2
 #
@@ -23,12 +23,23 @@
 # are detected by CLAUDE_CODE_REMOTE=true.
 set -u
 
+# A list variable plus any extras named <NAME>_<SUFFIX> (e.g. CLOUD_AWS_PROFILES_LEGACY), joined
+# with commas, so groups of accounts can live in separate variables.
+joined_list() {
+    local base=$1 name value out=${!1:-}
+    for name in $(compgen -v | grep -E "^${base}_[A-Z0-9_]+\$" | sort); do
+        value=${!name:-}
+        [ -n "$value" ] && out=${out:+$out,}$value
+    done
+    printf '%s' "$out"
+}
+
 LOG_FILE=${CLOUD_SESSION_LOG:-/tmp/cloud-session-start.log}
 BASE_PROFILE=${CLOUD_AWS_BASE_PROFILE:-cloud-base}
 BASE_REGION=${CLOUD_AWS_BASE_REGION:-us-east-1}
 # Targets production-write.sh can open (target:account_id:profile_name:region, comma-separated).
 # Their profiles are removed together with everything else if the key goes away.
-WRITE_TARGETS=${CLOUD_AWS_WRITE_TARGETS:-}
+WRITE_TARGETS=$(joined_list CLOUD_AWS_WRITE_TARGETS)
 
 log() {
     printf '%s %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$*" >> "$LOG_FILE" 2>/dev/null || true
@@ -73,7 +84,7 @@ main() {
     # Accept the original Claude-specific names too, so existing environments keep working.
     local key_id=${CLOUD_AWS_ACCESS_KEY_ID:-${CLAUDE_CLOUD_AWS_ACCESS_KEY_ID:-}}
     local secret=${CLOUD_AWS_SECRET_ACCESS_KEY:-${CLAUDE_CLOUD_AWS_SECRET_ACCESS_KEY:-}}
-    local profiles=${CLOUD_AWS_PROFILES:-}
+    local profiles; profiles=$(joined_list CLOUD_AWS_PROFILES)
 
     umask 077
     mkdir -p "$HOME/.aws" && chmod 700 "$HOME/.aws"

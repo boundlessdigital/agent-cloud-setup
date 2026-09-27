@@ -36,6 +36,7 @@ On Claude Code on the web: claude.ai/code → the environment's gear icon → **
 | `CLOUD_AWS_ACCESS_KEY_ID`, `CLOUD_AWS_SECRET_ACCESS_KEY` | For AWS | Your cloud IAM user's access key. Not the standard `AWS_*` names on purpose. |
 | `CLOUD_AWS_PROFILES` | For AWS | Your profiles, comma-separated `name:account_id:role:region` |
 | `AWS_PROFILE`, `AWS_REGION` | For AWS | The profile and region commands use by default |
+| `CLOUD_AWS_PROFILES_<SUFFIX>`, `CLOUD_AWS_WRITE_TARGETS_<SUFFIX>` | No | Extra groups in the same formats, e.g. `CLOUD_AWS_PROFILES_LEGACY`. They are joined to the base lists, so a new group of accounts doesn't mean editing the existing line. |
 | `CLOUD_AWS_MFA_SERIAL`, `CLOUD_AWS_WRITE_TARGETS` | For production write | Your MFA device ARN, and comma-separated `target:account_id:profile:region` |
 | `NODE_AUTH_TOKEN` | Yes | GitHub token with `read:packages` (and `write:packages` to publish) |
 | `FIREWORKS_API_KEY` | Yes | Model key for OpenCode, Pi and Hermes |
