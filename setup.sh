@@ -89,6 +89,26 @@ done
     && ln -sf "$HOME/.local/bin/hermes" /usr/local/bin/hermes
 ) || log "WARN: hermes install failed (see /tmp/hermes-install.log)" &
 
+# Playwright browsers matching each cloned repository's pinned Playwright. The image ships one fixed
+# browser build (in /opt/pw-browsers), and a repository pinned to another Playwright version can't
+# launch it (bng-platform's @playwright/test 1.63.0 needs build 1243; the image had 1194). The
+# repositories are cloned before this script runs, so read their package.json files.
+(
+  browsers_path=${PLAYWRIGHT_BROWSERS_PATH:-}
+  [ -z "$browsers_path" ] && [ -d /opt/pw-browsers ] && browsers_path=/opt/pw-browsers
+  find / -xdev -maxdepth 4 -name package.json -not -path '*/node_modules/*' -not -path '/usr/*' -not -path '/opt/*' -not -path '/proc/*' 2>/dev/null \
+    | while read -r manifest; do
+        jq -r '.devDependencies["@playwright/test"] // .dependencies["@playwright/test"] // empty' "$manifest" 2>/dev/null
+      done | sed 's/^[\^~]//' | grep -E '^[0-9]+\.[0-9]+\.[0-9]+$' | sort -u \
+    | while read -r version; do
+        if env ${browsers_path:+PLAYWRIGHT_BROWSERS_PATH=$browsers_path} npx -y "playwright@$version" install chromium chromium-headless-shell >/tmp/playwright-install.log 2>&1; then
+          log "playwright $version browsers installed${browsers_path:+ in $browsers_path}"
+        else
+          log "WARN: playwright $version browser install failed (see /tmp/playwright-install.log)"
+        fi
+      done
+) &
+
 wait
 log "tools installed: jq $(jq --version 2>/dev/null), gh $(gh --version 2>/dev/null | head -1 | cut -d' ' -f3), uv $(uv --version 2>/dev/null | cut -d' ' -f2), aws $(aws --version 2>/dev/null | cut -d' ' -f1), sops $(sops --version 2>/dev/null | head -1 | cut -d' ' -f2), pnpm $(pnpm --version 2>/dev/null), opencode $(opencode --version 2>/dev/null), codex $(codex --version 2>/dev/null | cut -d' ' -f2), pi $(pi --version 2>/dev/null), hermes $(hermes --version 2>/dev/null | head -1)"
 
