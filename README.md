@@ -52,6 +52,18 @@ Ask Sidney for your IAM user, profile list and MFA setup.
 cloud-doctor --agents
 ```
 
+## MCP servers in every session
+
+Setup registers these at user scope, so they're there in every repository. A repository's own `.mcp.json` entry with the same name takes precedence.
+
+| Server | Needs variable |
+|---|---|
+| `meraki-docs` (Meraki API documentation) | `MERAKI_DOCS_MCP_TOKEN` |
+| `aws-compliance-rules` (AWS compliance rules) | `AWS_COMPLIANCE_RULES_MCP_TOKEN` |
+| `awslabs.aws-documentation-mcp-server` (AWS documentation, pinned 1.1.28) | none |
+
+Tokens stay in the environment's variables; the config only holds `${VAR}` references.
+
 ## Day to day
 
 | Task | How |
