@@ -11,7 +11,8 @@
 #
 # Contains NO secrets: every key comes from the environment's variables at run time (see README.md).
 # Runs as root, once per cached environment build. Must exit 0 and finish within ~5 minutes.
-# Status lines are kept in /var/log/cloud-setup.log.
+# Status lines are kept in /var/log/cloud-setup.log, including a "finished: <tool>" line per install
+# job, so the slowest job is visible from the timestamps.
 
 set -u
 # The script's own status lines are also appended to /var/log/cloud-setup.log. (Redirecting the
@@ -43,6 +44,7 @@ done
 #    uv and Python are pinned by scripts/mcp/run_mcp_package.mjs (REVIEWED_UV_VERSION,
 #    REVIEWED_PYTHON_VERSION); the AWS MCP servers refuse to start on other versions.
 (
+  trap 'log "finished: uv, python, graphify"' EXIT; 
   # The image ships an older uv in /root/.local/bin; replace it there so it wins on PATH.
   curl -LsSf https://astral.sh/uv/0.11.19/install.sh | env UV_INSTALL_DIR="$HOME/.local/bin" UV_NO_MODIFY_PATH=1 sh \
     && ln -sf "$HOME/.local/bin/uv" /usr/local/bin/uv && ln -sf "$HOME/.local/bin/uvx" /usr/local/bin/uvx \
@@ -52,6 +54,7 @@ done
 ) || log "WARN: uv/python/graphify install failed" &
 
 (
+  trap 'log "finished: aws cli"' EXIT; 
   cd /tmp && curl -sSL https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip -o awscli.zip \
     && unzip -q -o awscli.zip && ./aws/install --update
 ) || log "WARN: aws cli install failed" &
@@ -59,6 +62,7 @@ done
 # sops: the release's prebuilt binary, checked against its published SHA-256. (Compiling it with
 # `go install` took minutes and was the slowest step of the whole setup.)
 (
+  trap 'log "finished: sops"' EXIT; 
   case "$(uname -m)" in aarch64|arm64) sops_arch=arm64 ;; *) sops_arch=amd64 ;; esac
   sops_file="sops-v3.13.3.linux.$sops_arch"
   cd /tmp && curl -fsSL "https://github.com/getsops/sops/releases/download/v3.13.3/$sops_file" -o "$sops_file" \
@@ -67,24 +71,25 @@ done
     && install -m 755 "$sops_file" /usr/local/bin/sops
 ) || log "WARN: sops install failed" &
 
-(corepack enable && corepack prepare pnpm@10.34.2 --activate) || log "WARN: pnpm 10.34.2 activation failed" &
+(trap 'log "finished: pnpm"' EXIT; corepack enable && corepack prepare pnpm@10.34.2 --activate) || log "WARN: pnpm 10.34.2 activation failed" &
 
 # jq and the GitHub CLI ship with the base image; install them only if a future image drops them.
 # gh needs no login in the cloud: the session's GitHub proxy substitutes your own credentials.
-(command -v jq >/dev/null || (apt-get update -qq && apt-get install -y -qq jq)) || log "WARN: jq install failed" &
-(command -v gh >/dev/null || (apt-get update -qq && apt-get install -y -qq gh)) || log "WARN: gh install failed" &
+(trap 'log "finished: jq"' EXIT; command -v jq >/dev/null || (apt-get update -qq && apt-get install -y -qq jq)) || log "WARN: jq install failed" &
+(trap 'log "finished: gh"' EXIT; command -v gh >/dev/null || (apt-get update -qq && apt-get install -y -qq gh)) || log "WARN: gh install failed" &
 
 # Coding agents, pinned to the versions the team uses. OpenCode, Pi and Hermes read their model
 # keys from FIREWORKS_API_KEY / CEREBRAS_API_KEY. Codex signs in per session with
 # `codex login --device-auth` (a code approved on your phone), because a copied ChatGPT login
 # stops working once it refreshes.
-(npm install -g --silent opencode-ai@1.18.31 @openai/codex@0.155.1 @earendil-works/pi-coding-agent@0.83.0) \
+(trap 'log "finished: opencode, codex, pi"' EXIT; npm install -g --silent opencode-ai@1.18.31 @openai/codex@0.155.1 @earendil-works/pi-coding-agent@0.83.0) \
   || log "WARN: opencode/codex/pi install failed" &
 
 # Hermes Agent (Nous Research), official installer. --skip-setup skips its interactive wizard;
 # --skip-browser skips its Chromium download, the other slow step. Add it back in a session with
 # `hermes pm install agent-browser` if you need Hermes to drive a browser.
 (
+  trap 'log "finished: hermes"' EXIT; 
   curl -fsSL https://hermes-agent.nousresearch.com/install.sh | bash -s -- --skip-setup --skip-browser >/tmp/hermes-install.log 2>&1 \
     && ln -sf "$HOME/.local/bin/hermes" /usr/local/bin/hermes
 ) || log "WARN: hermes install failed (see /tmp/hermes-install.log)" &
@@ -94,6 +99,7 @@ done
 # launch it (bng-platform's @playwright/test 1.63.0 needs build 1243; the image had 1194). The
 # repositories are cloned before this script runs, so read their package.json files.
 (
+  trap 'log "finished: playwright browsers"' EXIT; 
   browsers_path=${PLAYWRIGHT_BROWSERS_PATH:-}
   [ -z "$browsers_path" ] && [ -d /opt/pw-browsers ] && browsers_path=/opt/pw-browsers
   find / -xdev -maxdepth 4 -name package.json -not -path '*/node_modules/*' -not -path '/usr/*' -not -path '/opt/*' -not -path '/proc/*' 2>/dev/null \
