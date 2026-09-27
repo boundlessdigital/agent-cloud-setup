@@ -91,12 +91,13 @@ done
 # timed run Hermes was the slowest install. The installer is taken from the same release commit: the
 # hosted one tracks main and expects files older releases lack (pm/lock.json, pm.cli), so it failed
 # against the pinned release. To move to a newer release, set HERMES_COMMIT to that tag's commit.
-# --skip-setup skips the interactive wizard; --skip-browser skips its Playwright/Chromium download
+# --force-commit also rolls back an existing newer checkout (without it the installer ignores
+# --commit when the machine already has a newer Hermes). --skip-setup skips the interactive wizard; --skip-browser skips its Playwright/Chromium download
 # (re-run the installer without it if you need Hermes to drive a browser).
 HERMES_COMMIT=f97608f178d1ffeca59860195ab7da295f7c8e5f
 (
   trap 'log "finished: hermes"' EXIT; 
-  curl -fsSL "https://raw.githubusercontent.com/NousResearch/hermes-agent/$HERMES_COMMIT/scripts/install.sh" | bash -s -- --commit "$HERMES_COMMIT" --skip-setup --skip-browser >/tmp/hermes-install.log 2>&1 \
+  curl -fsSL "https://raw.githubusercontent.com/NousResearch/hermes-agent/$HERMES_COMMIT/scripts/install.sh" | bash -s -- --commit "$HERMES_COMMIT" --force-commit --skip-setup --skip-browser >/tmp/hermes-install.log 2>&1 \
     && ln -sf "$HOME/.local/bin/hermes" /usr/local/bin/hermes
 ) || log "WARN: hermes install failed (see /tmp/hermes-install.log)" &
 
