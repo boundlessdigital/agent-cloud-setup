@@ -50,6 +50,7 @@ done
     && ln -sf "$HOME/.local/bin/uv" /usr/local/bin/uv && ln -sf "$HOME/.local/bin/uvx" /usr/local/bin/uvx \
     && uv python install 3.10.20 \
     && uv tool install graphifyy==0.9.47 \
+    && uv tool install --python 3.10.20 awslabs.aws-documentation-mcp-server==1.1.28 \
     && ln -sf "$HOME/.local/bin/graphify" /usr/local/bin/graphify
 ) || log "WARN: uv/python/graphify install failed" &
 
@@ -293,6 +294,28 @@ if [ "$NO_PERMISSION_PROMPTS" = true ]; then
     log "WARN: could not write $settings"
   fi
 fi
+
+# 6. MCP servers every session gets, in any repository (user scope, ~/.claude.json). Tokens are
+#    never written here: headers use ${VAR} and Claude Code expands them from the environment's
+#    variables when the session starts. A repository's own .mcp.json entry with the same name wins
+#    (project scope outranks user scope), so bng-platform keeps its pinned definitions.
+register_mcp() {
+  local name=$1 json=$2
+  if command -v claude >/dev/null 2>&1; then
+    claude mcp remove --scope user "$name" >/dev/null 2>&1 || true
+    claude mcp add-json --scope user "$name" "$json" >/dev/null 2>&1 && return 0
+  fi
+  # Fallback without the CLI: merge the entry into ~/.claude.json directly.
+  local file="$HOME/.claude.json"
+  [ -s "$file" ] || echo '{}' > "$file"
+  jq --arg name "$name" --argjson entry "$json" '.mcpServers[$name] = $entry' "$file" > "$file.tmp" && mv "$file.tmp" "$file"
+}
+register_mcp meraki-docs '{"type":"http","url":"https://meraki.documentation.mcp.boundlessdigital.ai/mcp","headers":{"Authorization":"Bearer ${MERAKI_DOCS_MCP_TOKEN}"}}'
+register_mcp aws-compliance-rules '{"type":"http","url":"https://compliance.mcp.boundlessdigital.ai/mcp","headers":{"Authorization":"Bearer ${AWS_COMPLIANCE_RULES_MCP_TOKEN}"}}'
+if [ -x "$HOME/.local/bin/awslabs.aws-documentation-mcp-server" ]; then
+  register_mcp awslabs.aws-documentation-mcp-server "$(jq -nc --arg cmd "$HOME/.local/bin/awslabs.aws-documentation-mcp-server" '{type:"stdio",command:$cmd,args:[],env:{FASTMCP_LOG_LEVEL:"ERROR",AWS_DOCUMENTATION_PARTITION:"aws"}}')"
+fi
+log "mcp servers (user scope): $(jq -r '.mcpServers // {} | keys | join(", ")' "$HOME/.claude.json" 2>/dev/null)"
 
 log "done"
 exit 0
