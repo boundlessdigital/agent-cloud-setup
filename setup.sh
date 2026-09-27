@@ -85,12 +85,17 @@ done
 (trap 'log "finished: opencode, codex, pi"' EXIT; npm install -g --silent opencode-ai@1.18.31 @openai/codex@0.155.1 @earendil-works/pi-coding-agent@0.83.0) \
   || log "WARN: opencode/codex/pi install failed" &
 
-# Hermes Agent (Nous Research), official installer. --skip-setup skips its interactive wizard;
+# Hermes Agent (Nous Research), official installer, pinned to release v2026.9.24 (f97608f17). Unpinned,
+# it installs the tip of main, which changes several times a day, and every new commit means a
+# rebuild of its interface. On 2026-09-27 one setup took 4 min 20 s (the caching limit is about 5),
+# and in the next timed run Hermes was the slowest install. To move to a newer release, update HERMES_COMMIT to that release tag's commit.
+# --skip-setup skips its interactive wizard;
 # --skip-browser skips its Chromium download, the other slow step. Add it back in a session with
 # `hermes pm install agent-browser` if you need Hermes to drive a browser.
+HERMES_COMMIT=f97608f178d1ffeca59860195ab7da295f7c8e5f
 (
   trap 'log "finished: hermes"' EXIT; 
-  curl -fsSL https://hermes-agent.nousresearch.com/install.sh | bash -s -- --skip-setup --skip-browser >/tmp/hermes-install.log 2>&1 \
+  curl -fsSL https://hermes-agent.nousresearch.com/install.sh | bash -s -- --commit "$HERMES_COMMIT" --skip-setup --skip-browser >/tmp/hermes-install.log 2>&1 \
     && ln -sf "$HOME/.local/bin/hermes" /usr/local/bin/hermes
 ) || log "WARN: hermes install failed (see /tmp/hermes-install.log)" &
 
