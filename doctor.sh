@@ -44,6 +44,7 @@ CLOUD_AWS_SECRET_ACCESS_KEY=${CLOUD_AWS_SECRET_ACCESS_KEY:-${CLAUDE_CLOUD_AWS_SE
 
 echo "== tools"
 tool jq 'jq --version'
+tool dig 'dig -v 2>&1'
 tool gh 'gh --version'
 tool aws 'aws --version'
 tool uv 'uv --version'

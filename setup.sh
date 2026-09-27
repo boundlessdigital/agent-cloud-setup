@@ -77,6 +77,9 @@ done
 # gh needs no login in the cloud: the session's GitHub proxy substitutes your own credentials.
 (trap 'log "finished: jq"' EXIT; command -v jq >/dev/null || (apt-get update -qq && apt-get install -y -qq jq)) || log "WARN: jq install failed" &
 (trap 'log "finished: gh"' EXIT; command -v gh >/dev/null || (apt-get update -qq && apt-get install -y -qq gh)) || log "WARN: gh install failed" &
+# dig and nslookup (dnsutils) for DNS checks, e.g. confirming a new record on the zone's own name
+# servers; the base image doesn't ship them.
+(trap 'log "finished: dnsutils"' EXIT; command -v dig >/dev/null || (apt-get update -qq && apt-get install -y -qq dnsutils)) || log "WARN: dnsutils install failed" &
 
 # Coding agents, pinned to the versions the team uses. OpenCode, Pi and Hermes read their model
 # keys from FIREWORKS_API_KEY / CEREBRAS_API_KEY. Codex signs in per session with
@@ -123,7 +126,7 @@ HERMES_COMMIT=f97608f178d1ffeca59860195ab7da295f7c8e5f
 ) &
 
 wait
-log "tools installed: jq $(jq --version 2>/dev/null), gh $(gh --version 2>/dev/null | head -1 | cut -d' ' -f3), uv $(uv --version 2>/dev/null | cut -d' ' -f2), aws $(aws --version 2>/dev/null | cut -d' ' -f1), sops $(sops --version 2>/dev/null | head -1 | cut -d' ' -f2), pnpm $(pnpm --version 2>/dev/null), opencode $(opencode --version 2>/dev/null), codex $(codex --version 2>/dev/null | cut -d' ' -f2), pi $(pi --version 2>/dev/null), hermes $(hermes --version 2>/dev/null | head -1)"
+log "tools installed: jq $(jq --version 2>/dev/null), dig $(dig -v 2>&1 | head -1 | cut -d" " -f2), gh $(gh --version 2>/dev/null | head -1 | cut -d' ' -f3), uv $(uv --version 2>/dev/null | cut -d' ' -f2), aws $(aws --version 2>/dev/null | cut -d' ' -f1), sops $(sops --version 2>/dev/null | head -1 | cut -d' ' -f2), pnpm $(pnpm --version 2>/dev/null), opencode $(opencode --version 2>/dev/null), codex $(codex --version 2>/dev/null | cut -d' ' -f2), pi $(pi --version 2>/dev/null), hermes $(hermes --version 2>/dev/null | head -1)"
 
 # 2. AWS credentials. A setup script does not see the environment's variables, so the credentials
 #    are written at run time instead, automatically, whatever the repository or agent:
