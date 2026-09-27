@@ -8,13 +8,25 @@
 #
 # It needs, in the cloud environment's variables (see README.md):
 #   CLOUD_AWS_MFA_SERIAL      ARN of the MFA device on the cloud IAM user
-#   CLOUD_AWS_WRITE_TARGETS   comma-separated  target:account_id:profile_name:region
+#   CLOUD_AWS_WRITE_TARGETS   (plus any CLOUD_AWS_WRITE_TARGETS_<SUFFIX>) comma-separated  target:account_id:profile_name:region
 #                             e.g. production:222222222222:prod:us-east-2
 #   CLOUD_AWS_WRITE_ROLE      role to assume in the target account (default ClaudeCloudProductionWrite)
 # and the cloud-base profile written by session-start.sh.
 #
 # Prints only the profile name and the expiry time, never the credentials.
 set -euo pipefail
+
+# A list variable plus any extras named <NAME>_<SUFFIX> (e.g. CLOUD_AWS_PROFILES_LEGACY), joined
+# with commas, so groups of accounts can live in separate variables.
+joined_list() {
+    local base=$1 name value out=${!1:-}
+    for name in $(compgen -v | grep -E "^${base}_[A-Z0-9_]+\$" | sort); do
+        value=${!name:-}
+        [ -n "$value" ] && out=${out:+$out,}$value
+    done
+    printf '%s' "$out"
+}
+CLOUD_AWS_WRITE_TARGETS=$(joined_list CLOUD_AWS_WRITE_TARGETS)
 
 BASE_PROFILE=${CLOUD_AWS_BASE_PROFILE:-cloud-base}
 WRITE_ROLE=${CLOUD_AWS_WRITE_ROLE:-ClaudeCloudProductionWrite}

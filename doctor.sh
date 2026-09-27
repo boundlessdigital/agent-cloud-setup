@@ -42,6 +42,19 @@ variable() {
 CLOUD_AWS_ACCESS_KEY_ID=${CLOUD_AWS_ACCESS_KEY_ID:-${CLAUDE_CLOUD_AWS_ACCESS_KEY_ID:-}}
 CLOUD_AWS_SECRET_ACCESS_KEY=${CLOUD_AWS_SECRET_ACCESS_KEY:-${CLAUDE_CLOUD_AWS_SECRET_ACCESS_KEY:-}}
 
+# A list variable plus any extras named <NAME>_<SUFFIX> (e.g. CLOUD_AWS_PROFILES_LEGACY), joined
+# with commas, so groups of accounts can live in separate variables.
+joined_list() {
+    local base=$1 name value out=${!1:-}
+    for name in $(compgen -v | grep -E "^${base}_[A-Z0-9_]+\$" | sort); do
+        value=${!name:-}
+        [ -n "$value" ] && out=${out:+$out,}$value
+    done
+    printf '%s' "$out"
+}
+CLOUD_AWS_PROFILES=$(joined_list CLOUD_AWS_PROFILES)
+CLOUD_AWS_WRITE_TARGETS=$(joined_list CLOUD_AWS_WRITE_TARGETS)
+
 echo "== tools"
 tool jq 'jq --version'
 tool dig 'dig -v 2>&1'
